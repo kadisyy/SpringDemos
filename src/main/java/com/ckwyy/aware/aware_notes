@@ -1,0 +1,26 @@
+1. 什么是spring的Aware呢?
+
+https://blog.csdn.net/mjlfto/article/details/104235634
+package org.springframework.beans.factory;
+public interface Aware {
+}
+
+是一个bean factory,  这些会实现一系列的后置处理器. 具体实现了哪些接口呢?
+比如:
+类名	作用
+BeanNameAware	获取容器中bean名称
+BeanClassLoaderAware	获得类加载器
+BeanFactoryAware	获得bean创建工厂
+EnviromentAware	获得环境变量
+EnvironmentValueResolverAware	获取spring容器加载的properties文件属性值
+ResourceLoaderAware	获得资源加载器
+ApplicationEventPublisherAware　　	获得应用程序发布器
+MessageSourceAware	获得文本信息
+ApplicationContextAware　　	获得当前应用上下
+
+实现这些接口的地方,就是后置处理器; 当然我们也可以实现Aware接口, 自定义aware; 其实本质就是回调函数
+
+2.spring中的FactoryBean与ObjectFactory的区别
+ObjectFactory FactoryBean FactoryMethod
+ObjectFactory就是一个普通的工厂对象接口，对于spring在doGetBean处的使用时，在于创建对象的过程由框架通过ObjectFactory定义
+利用反編譯 生產對於class

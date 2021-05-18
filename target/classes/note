@@ -1,0 +1,127 @@
+1. bean注入的几种方式?
+        a. xml <bean
+        b. @Bean
+        c. 包扫描. @Component @Service @Controller @Repository @ComponentScan(basePackages = "com.ckwyy.bean.controller") //指定某一个路径自动指定扫描规则
+            ANNOTATION,   --------指定具体类型
+            ASSIGNABLE_TYPE, -----指定具体类
+            ASPECTJ, -------------使用ASPECTJ
+            REGEX,  --------------使用正则
+            CUSTOM;  -------------自定义
+        d. 自定义FilterType
+        e. @Import\ImportSelector\ImportBeanDefinitionRegistrar 手动注册bean: registry.registerBeanDefinition
+        f: spring提供的FactoryBean 工厂bean, 通过getObject方法返回创建的对象
+
+2.bean的生命周期
+        bean 创建---初始化---销毁
+        a> 指定初始化和销毁方法  xml  init-method和destory-method,先调构造函数方法, 再init方法,然后构造完成.applicationContext02.close();调用销毁方法
+        b> bean初始化InitalizingBean 和 DisposeBean
+        c> JSR250注解  @PostConstruct @PreDestroy
+        d> BeanPostProcessor: 后置处理器
+
+        调用顺序: 构造函数-->postProcessBeforeInitialization-->afterPropertiesSet-->postProcessAfterInitialization-->destroy[close]
+         &&
+        调用顺序: 构造函数-->postProcessBeforeInitialization-->@PostConstruct-->postProcessAfterInitialization-->destroy[close]
+
+3. 創建bean 源碼
+Spring-IOC bean 创建过程中的 ObjectFactory
+https://www.cnblogs.com/leihuazhe/p/9481018.html
+
+
+4. 创建过程
+1>.prepareRefresh();创建前预处理
+        11>initPropertySources(); 初始化属性, 子类可以自我实现
+        12>getEnvironment 检测合法性
+        13>this.earlyApplicationEvents = new LinkedHashSet<ApplicationEvent>(); 保存容器内早起事件
+
+2>obtainFreshBeanFactory 获取bean工厂
+21>refreshBeanFactory 刷新beanFactory
+22> getBeanFactory 返回之前创建好的BeanFactory
+
+3>			prepareBeanFactory(beanFactory);
+31> 设置BeanFactory 类加载器,部分postProcessor等等
+
+4> prepareBeanFactory  初始化BeanFactory东西
+
+5>postProcessBeanFactory(beanFactory);
+51> 子类通过重写, 可以改写属性等
+public class MyBeanFactoryProcessor implements BeanFactoryPostProcessor {
+
+=================================================以上是BeanFactory的预准备过程===================================================
+
+
+6.invokeBeanFactoryPostProcessors : 执行beanFactory postprocessor
+  BeanFactoryPostProcessor: BeanFactory的后置处理器. 在BeanFactory 标准初始化之后;[postProcessBeanFactory]
+  两个接口:BeanFactoryPostProcessor和其下子接口BeanDefinitionRegistryPostProcessor[postProcessBeanDefinitionRegistry]
+  1. invokeBeanFactoryPostProcessors
+     先执行BeanDefinitionRegistryPostProcessor:按照继承接口processor排序:
+     a. PriorityOrdered			// First, invoke the BeanDefinitionRegistryPostProcessors that implement PriorityOrdered.
+     b.Ordered 			// Next, invoke the BeanDefinitionRegistryPostProcessors that implement Ordered.
+     c.			// Finally, invoke all other BeanDefinitionRegistryPostProcessors until no further ones appear.
+  2. 再执行BeanFactoryPostProcessor
+     如上, 都是看是否实现了什么接口?  排序
+
+     子接口具有最高优先级
+     都有什么作用呢?
+     BeanFactoryPostProcessor接口与 BeanPostProcessor接口类似,可以对bean的定义(配置元数据)进行处理；
+     也就是spring ioc运行BeanFactoryPostProcessor在容器实例化任何其他的bean之前读取配置元数据,并有可能修改它；
+     如果业务需要，可以配置多个BeanFactoryPostProcessor的实现类，通过”order”控制执行次序(要实现Ordered接口)。
+     允许我们在工厂里所有的bean被加载进来后但是还没初始化前，对所有bean的属性进行修改也可以add属性值。
+      BeanFactoryPostProcessor是在Bean实例化前的操作，BeanPostProcessor是在Bean初始化前(Before)和初始化后(After)的相关操作.[init方法]
+     简单介绍几个:
+     2.1>例子:
+        public class CustomBeanFactoryPostProcessor implements BeanFactoryPostProcessor{
+            @Override
+            public void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory) throws BeansException {
+                System.out.println("postProcessBeanFactory");
+                //获取BeanDefinition
+                BeanDefinition beanDefinition = beanFactory.getBeanDefinition("myTestBean");
+                System.out.println("修改属性name值");
+                beanDefinition.getPropertyValues().add("name", "liSi");
+            }
+7.registerBeanPostProcessors(beanFactory);
+注册Bean的后置处理器[拦截bean的创建过程], 不同接口类型的BeanPostProcessor 执行时机不一样的;
+   BeanPostProcessor
+       DestructionAwareBeanPostProcessor: destroy 方法
+       AutowiredAnnotationBeanPostProcessor
+       MergedBeanDefinitionPostProcessor
+       SmartInstantiationAwareBeanPostProcessor
+   7.1.获取所以的BeanPostProcessor:后置处理器都实现了优先级的接口, 每一个不同类型的子接口类型会进行归类;
+   7.2. 先注册PriorityOrdered接口
+   7.3. 再注册Ordered接口
+   7.4. 最后注册没有实现任何接口的
+   7.5. 最终注册实现MergedBeanDefinitionPostProcessor的
+   7.6. 注册一个Listener
+8. InitMessageSource  [国际化操作\消息绑定\消息解析等]
+9. OnRefresh: 子类重写方法
+10. registerListeners: 注册监听器, 和添加事件派发器
+11.finishBeanFactoryInitialization
+初始化所有剩下的单实例Bean
+第一步:		beanFactory.preInstantiateSingletons();
+I> 获取所有的bean信息:this.beanDefinitionNames), 以此初始化和创建对象[.beanFactory.registerBeanDefinition]
+观察是不是单实例,抽象,懒加载等.
+a. 判断是不是FactoryBean, 如果是是要GetObject方法创建bean
+b. 如果不是, getBean(beanName);-- doGetBean(name, null, null, false)--从缓存获取对象实例--获取Bean的定义信息--获取创建时候依赖的Bean;
+   如果有, GetBean 方式如上!singletonObjects
+c.applyBeanPostProcessorsBeforeInstantiation\applyBeanPostProcessorsAfterInitialization
+
+
+
+/***************************处理顺序******************************
+appleInstantiationAwareBeanPostProcessor_bean 实例化之前
+apple_实例化
+appleInstantiationAwareBeanPostProcessorbean_实例化之后
+appleInstantiationAwareBeanPostProcessor_bean 变量处理
+apple01_bean实例化前
+appleInstantiationAwareBeanPostProcessor_bean 初始化之前
+apple_@PostConstruct
+apple_afterPropertiesSet
+apple01_bean实例化后
+appleInstantiationAwareBeanPostProcessor_bean 初始化之后
+apple01_bean销毁前
+apple_@PreDestroy
+
+
+
+
+
+
